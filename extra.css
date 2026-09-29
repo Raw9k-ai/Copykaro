@@ -1,0 +1,14 @@
+input[type='email'], input[type='password'], input:not([type]), input[type='text'] {
+  display: block; width: 100%; font: inherit; padding: 8px; margin-top: 4px;
+  border: 2px solid var(--ink); border-radius: 6px; background: #fff;
+}
+input[type='file'] { display: block; margin-top: 6px; font: inherit; max-width: 100%; }
+select:disabled { opacity: 0.55; }
+.btn:disabled { opacity: 0.6; cursor: wait; }
+.bar-inner { flex-wrap: wrap; gap: 8px; }
+nav { flex-wrap: wrap; }
+.foot { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 0.875rem; }
+.linkbtn { font: inherit; background: none; border: none; color: var(--ink); text-decoration: underline; cursor: pointer; padding: 0; }
+.tag.st-approved { background: #d8f0e4; border-color: var(--ok); color: #1c5c42; }
+.tag.st-pending { background: var(--hl); border-color: var(--ink); color: var(--ink); }
+.tag.st-rejected { background: #fbe0de; border-color: #b3261e; color: #b3261e; }
