@@ -31,7 +31,7 @@ export function Home() {
   useEffect(() => {
     supabase
       .from('subjects')
-      .select('id,name,code,semesters(course,branch,number),units(topics(id,notes(current_version_id)))')
+      .select('id,name,code,semesters(college,course,branch,number),units(topics(id,notes(current_version_id)))')
       .order('name')
       .then(({ data, error }) => (error ? setError(error.message) : setSubjects(data)))
   }, [])
@@ -133,12 +133,13 @@ export function Home() {
                   <Link key={s.id} to={`/subject/${s.id}`} className={`subject-card tone-${i % 6}`}>
                     <div className="sc-ic"><Icon name={SUBJECT_ICONS[i % 6]} /></div>
                     <h3>{s.name}</h3>
-                    <p className="small muted">
-                      {s.units.length} {s.units.length === 1 ? 'Unit' : 'Units'}
-                      {sem ? `, Semester ${sem.number}` : ''}
-                    </p>
+                    {sem && <p className="small muted">{sem.course} {sem.branch}, Semester {sem.number}</p>}
+                    {s.code && <p className="small muted">Code: {s.code}</p>}
+                    {sem && <p className="small muted college">{sem.college}</p>}
                     <div className="progress"><span style={{ width: `${pct}%` }} /></div>
-                    <p className="small muted">{pct}% completed</p>
+                    <p className="small muted">
+                      {s.units.length} {s.units.length === 1 ? 'unit' : 'units'}, {pct}% completed
+                    </p>
                   </Link>
                 )
               })}
