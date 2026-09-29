@@ -10,6 +10,7 @@ import { Subject, Saved } from './subject'
 import { Topic } from './topic'
 import { Login, Contribute } from './staff'
 import { Admin } from './admin'
+import { Syllabus } from './syllabus'
 
 function App() {
   const auth = useAuthCtx()
@@ -26,6 +27,7 @@ function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/contribute" element={<Contribute />} />
       <Route path="/admin" element={<Admin />} />
+      <Route path="/admin/syllabus" element={<Syllabus />} />
       <Route path="*" element={<p>Page not found. <Link to="/">Go to subjects</Link></p>} />
     </Routes>
   )
@@ -49,7 +51,8 @@ function App() {
         <div className="staff-layout">
           <aside className="side">
             <NavLink to="/contribute">Upload notes</NavLink>
-            {auth.role === 'admin' && <NavLink to="/admin">Review</NavLink>}
+            {auth.role === 'admin' && <NavLink to="/admin" end>Review</NavLink>}
+            {auth.role === 'admin' && <NavLink to="/admin/syllabus">Syllabus</NavLink>}
             <Link to="/">View site</Link>
             <button className="linkbtn" onClick={() => supabase.auth.signOut()}>Sign out</button>
           </aside>
