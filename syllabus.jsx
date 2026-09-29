@@ -146,6 +146,19 @@ export function Syllabus() {
     }, 'Unit deleted.')
   }
 
+  const delSemester = () => {
+    const sem = sems.find((s) => s.id === semId)
+    if (!sem) return
+    const n = semSubjects.length
+    if (!window.confirm(`Delete ${sem.course} ${sem.branch}, Semester ${sem.number} (${sem.college}) with its ${n} subject(s), and all their units, topics and notes?`)) return
+    run(async () => {
+      await purge(semSubjects.flatMap((s) => s.units.flatMap((u) => u.topics.map((t) => t.id))))
+      must(await supabase.from('semesters').delete().eq('id', semId))
+      setSemId('')
+      setSubId('')
+    }, 'Semester deleted.')
+  }
+
   const delSubject = (s) => {
     if (!window.confirm(`Delete the subject "${s.name}" with all units, topics and notes?`)) return
     run(async () => {
@@ -173,6 +186,9 @@ export function Syllabus() {
           </label>
         ) : (
           <p className="empty">No semester yet. Add one below.</p>
+        )}
+        {semId && (
+          <button className="btn small reject" disabled={busy} onClick={delSemester}>Delete this semester</button>
         )}
         <details className="panel">
           <summary>Add a new semester</summary>
