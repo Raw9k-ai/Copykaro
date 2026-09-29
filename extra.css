@@ -65,3 +65,4 @@
 .tab { font: inherit; font-weight: 700; background: none; border: none; padding: 10px 14px; color: var(--muted); cursor: pointer; border-bottom: 3px solid transparent; white-space: nowrap; }
 .tab.on { color: var(--blue); border-bottom-color: var(--blue); }
 .review { margin-bottom: 14px; }
+.subject-card .college { font-size: 0.78rem; opacity: 0.85; margin-bottom: 0; }
