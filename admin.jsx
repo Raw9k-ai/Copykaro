@@ -48,14 +48,18 @@ export function Admin() {
     load()
   }
 
-  async function reject(id) {
+  async function reject(id, path) {
     setMsg('')
     if (!comments[id]?.trim()) return setMsg('Please write a reason before rejecting, so the contributor can fix it.')
+    if (!window.confirm('Reject this upload and permanently delete the file?')) return
     const { error } = await supabase
       .from('note_versions')
-      .update({ status: 'rejected', reviewed_by: auth.user.id, reviewed_at: new Date().toISOString(), review_comment: comments[id] })
+      .update({ status: 'rejected', reviewed_by: auth.user.id, reviewed_at: new Date().toISOString(), review_comment: comments[id].trim() })
       .eq('id', id)
-    setMsg(error ? 'Could not reject: ' + error.message : 'Rejected.')
+      .eq('status', 'pending')
+    if (error) return setMsg('Could not reject: ' + error.message)
+    const rm = await supabase.storage.from('notes').remove([path])
+    setMsg(rm.error ? 'Rejected, but the file could not be deleted: ' + rm.error.message : 'Rejected. The file was deleted and your reason was saved.')
     load()
   }
 
@@ -84,7 +88,7 @@ export function Admin() {
             </label>
             <div className="actions">
               <button className="btn ok" onClick={() => approve(v.id)}>Approve</button>
-              <button className="btn" onClick={() => reject(v.id)}>Reject</button>
+              <button className="btn" onClick={() => reject(v.id, v.file_path)}>Reject and delete file</button>
             </div>
           </div>
         ))}
