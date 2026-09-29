@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
 import { supabase, fileUrl, useSavedList } from './lib'
+import { useParams } from 'react-router-dom'
+import { Icon, Crumbs, Pill } from './ui'
 
 const REASONS = [
   ['incorrect', 'Incorrect content'],
@@ -35,6 +36,7 @@ export function Topic() {
       .then(async ({ data, error }) => {
         if (error) return setError(error.message)
         setTopic(data)
+        localStorage.setItem('copykaro:last', JSON.stringify({ id: data.id, title: data.title }))
         const note = Array.isArray(data.notes) ? data.notes[0] : data.notes
         if (note) {
           const { data: v } = await supabase
@@ -64,48 +66,68 @@ export function Topic() {
     if (!error) setDetails('')
   }
 
+  const crumbs = [{ to: '/', label: 'Subjects' }]
+  if (subject) crumbs.push({ to: `/subject/${subject.id}`, label: subject.name })
+  crumbs.push({ label: topic.title })
+
   return (
     <>
-      {subject && <Link to={`/subject/${subject.id}`} className="back">Back to {subject.name}</Link>}
-      <h1>{topic.title}</h1>
-      <p className="muted">Unit {topic.units.unit_number}: {topic.units.title}</p>
+      <Crumbs items={crumbs} />
+      <div className="card">
+        <div className="title-row">
+          <h1>{topic.title}</h1>
+          {current && <Pill tone="green">Current Version</Pill>}
+        </div>
+        <p className="meta">
+          Unit {topic.units.unit_number}: {topic.units.title}
+          {current ? `. Last updated ${fmt(current.created_at)}` : ''}
+        </p>
 
-      <div className="actions">
-        <button className={`btn ${isDone ? 'ok' : ''}`} onClick={() => toggleDone(topic.id)}>
-          {isDone ? 'Completed' : 'Mark complete'}
-        </button>
-        <button className={`btn ${isSaved ? 'hl' : ''}`} onClick={() => toggleSaved(topic.id)}>
-          {isSaved ? 'Bookmarked' : 'Bookmark'}
-        </button>
+        {current && (
+          <div className="actions">
+            <a className="btn primary" href={fileUrl(current.file_path)} target="_blank" rel="noreferrer">Read online</a>
+            <a className="btn" href={fileUrl(current.file_path, true)}><Icon name="download" size={18} /> Download PDF</a>
+          </div>
+        )}
+        <div className="actions">
+          <button className={`btn ${isDone ? 'ok' : ''}`} onClick={() => toggleDone(topic.id)}>
+            {isDone ? '✓ Completed' : 'Mark complete'}
+          </button>
+          <button className={`btn ${isSaved ? 'hl' : ''}`} onClick={() => toggleSaved(topic.id)}>
+            {isSaved ? 'Bookmarked' : 'Bookmark'}
+          </button>
+        </div>
       </div>
 
-      {!current && <p className="empty">Notes for this topic haven’t been added yet. Check back soon.</p>}
+      {!current && <p className="empty section">Notes for this topic haven’t been added yet. Check back soon.</p>}
 
       {current && (
         <>
-          <p className="small">Version {current.version_number}, updated {fmt(current.created_at)}</p>
-          <div className="actions">
-            <a className="btn primary" href={fileUrl(current.file_path)} target="_blank" rel="noreferrer">Open notes</a>
-            <a className="btn" href={fileUrl(current.file_path, true)}>Download PDF</a>
+          <div className="card summary">
+            <h3>Note summary</h3>
+            <p>{current.change_description || 'No summary was added for this version.'}</p>
+            <p className="small muted">Version {current.version_number}</p>
           </div>
           <iframe className="viewer" title={`${topic.title} notes`} src={fileUrl(current.file_path)} />
-          <p className="small muted">If the notes don’t show above, use Open notes.</p>
+          <p className="small muted">If the notes don’t show above, use Read online.</p>
         </>
       )}
 
       {versions.length > 0 && (
-        <details className="panel">
-          <summary>Version history ({versions.length})</summary>
+        <section className="card section">
+          <h2>Version history</h2>
           {versions.map((v) => (
-            <div key={v.id} className="version">
-              <strong>Version {v.version_number}</strong>
-              {v.id === current?.id && <span className="tag current">Current</span>}
-              <span className="small muted"> {fmt(v.created_at)}</span>
-              {v.change_description && <p>{v.change_description}</p>}
-              <a href={fileUrl(v.file_path)} target="_blank" rel="noreferrer">Open this version</a>
+            <div key={v.id} className="tl">
+              <div className={`tl-v ${v.id === current?.id ? 'cur' : ''}`}>v{v.version_number}</div>
+              <div className="tl-body">
+                <strong>{fmt(v.created_at)}</strong>
+                {v.id === current?.id && <> <Pill tone="green">Current</Pill></>}
+                {v.change_description && <p>{v.change_description}</p>}
+                <a href={fileUrl(v.file_path)} target="_blank" rel="noreferrer">Open this version</a>
+              </div>
             </div>
           ))}
-        </details>
+        </section>
       )}
 
       {note && current && (
