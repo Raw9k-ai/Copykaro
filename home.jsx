@@ -1,152 +1,156 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { supabase, useSavedList } from './lib'
+import { Icon, SUBJECT_ICONS, HeroArt } from './ui'
+
+const noteOf = (t) => (Array.isArray(t.notes) ? t.notes[0] : t.notes)
+
+const FEATURES = [
+  ['list', 'Organized by syllabus'],
+  ['refresh', 'Continuously updated'],
+  ['users', 'Student contributions'],
+  ['clock', 'Version history'],
+]
+
+function readLast() {
+  try {
+    return JSON.parse(localStorage.getItem('copykaro:last'))
+  } catch {
+    return null
+  }
+}
 
 export function Home() {
   const [subjects, setSubjects] = useState(null)
   const [error, setError] = useState('')
   const [done] = useSavedList('copykaro:done')
+  const [q, setQ] = useState('')
+  const [results, setResults] = useState(null)
+  const last = readLast()
 
   useEffect(() => {
     supabase
       .from('subjects')
-      .select('id,name,code,semesters(course,branch,number),units(topics(id))')
+      .select('id,name,code,semesters(course,branch,number),units(topics(id,notes(current_version_id)))')
       .order('name')
       .then(({ data, error }) => (error ? setError(error.message) : setSubjects(data)))
   }, [])
 
+  useEffect(() => {
+    const term = q.trim().replace(/[%_\\]/g, ' ')
+    if (term.length < 2) {
+      setResults(null)
+      return
+    }
+    let active = true
+    const timer = setTimeout(() => {
+      supabase
+        .from('topics')
+        .select('id,title,units(unit_number,title,subjects(name)),notes(current_version_id)')
+        .ilike('title', `%${term}%`)
+        .limit(20)
+        .then(({ data }) => {
+          if (active) setResults(data || [])
+        })
+    }, 250)
+    return () => {
+      active = false
+      clearTimeout(timer)
+    }
+  }, [q])
+
+  const allTopics = subjects ? subjects.flatMap((s) => s.units.flatMap((u) => u.topics)) : []
+  const withNotes = allTopics.filter((t) => noteOf(t)?.current_version_id).length
+
   return (
     <>
-      <h1>Your syllabus, one topic at a time</h1>
-      <p className="lead">Pick a subject, open a topic, read the current notes.</p>
+      <section className="hero">
+        <div>
+          <h1>Your Class. Your Notes. <span className="accent">Always Up to Date.</span></h1>
+          <p className="lead">
+            Find syllabus-aligned notes for your college, semester and subjects. Written by contributors, checked by an admin.
+          </p>
+          <div className="searchbox">
+            <Icon name="search" size={18} />
+            <input
+              type="search"
+              placeholder="Search topics, like Loops or Pointers"
+              aria-label="Search topics"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+          </div>
+          {last && !q && <Link to={`/topic/${last.id}`} className="btn primary">Continue: {last.title}</Link>}
+        </div>
+        <HeroArt />
+      </section>
 
       {error && <p className="error">Could not load subjects: {error}</p>}
-      {!subjects && !error && <p className="muted">Loading subjects…</p>}
-      {subjects && subjects.length === 0 && <p className="muted">No subjects have been added yet.</p>}
 
-      {subjects && subjects.map((s) => {
-        const ids = s.units.flatMap((u) => u.topics.map((t) => t.id))
-        const count = ids.filter((id) => done.includes(id)).length
-        const pct = ids.length ? Math.round((count / ids.length) * 100) : 0
-        const sem = s.semesters
-        return (
-          <Link key={s.id} to={`/subject/${s.id}`} className="row">
-            <div className="row-main">
-              <h2>{s.name}</h2>
-              <p className="muted">
-                {sem ? `${sem.course} ${sem.branch}, Semester ${sem.number}` : ''}
-                {s.code ? ` (${s.code})` : ''}
-              </p>
-              <div className="progress"><span style={{ width: `${pct}%` }} /></div>
-              <p className="small">{count} of {ids.length} topics done</p>
+      {results !== null && (
+        <section className="section">
+          <h2>Search results ({results.length})</h2>
+          {results.length === 0 && <p className="empty">No topics match “{q}”. Try a shorter word.</p>}
+          {results.length > 0 && (
+            <div className="list">
+              {results.map((t) => (
+                <Link key={t.id} to={`/topic/${t.id}`} className="row-link">
+                  <span className="row-title">
+                    {t.title}
+                    <span className="small muted block">{t.units?.subjects?.name}, Unit {t.units?.unit_number}</span>
+                  </span>
+                  {!noteOf(t)?.current_version_id && <span className="pill">No notes yet</span>}
+                  <span className="chev"><Icon name="chevron" size={18} /></span>
+                </Link>
+              ))}
             </div>
-          </Link>
-        )
-      })}
-    </>
-  )
-}
-
-export function Subject() {
-  const { id } = useParams()
-  const [subject, setSubject] = useState(null)
-  const [error, setError] = useState('')
-  const [done] = useSavedList('copykaro:done')
-
-  useEffect(() => {
-    supabase
-      .from('subjects')
-      .select('id,name,code,units(id,unit_number,title,topics(id,title,position,notes(current_version_id)))')
-      .eq('id', id)
-      .single()
-      .then(({ data, error }) => (error ? setError(error.message) : setSubject(data)))
-  }, [id])
-
-  if (error) return <p className="error">Could not load this subject: {error}</p>
-  if (!subject) return <p className="muted">Loading…</p>
-
-  const units = [...subject.units].sort((a, b) => a.unit_number - b.unit_number)
-  const allTopics = units.flatMap((u) => u.topics)
-  const count = allTopics.filter((t) => done.includes(t.id)).length
-  const pct = allTopics.length ? Math.round((count / allTopics.length) * 100) : 0
-
-  // First topic not yet completed, used for "Continue"
-  const next = units.flatMap((u) => [...u.topics].sort((a, b) => a.position - b.position))
-    .find((t) => !done.includes(t.id))
-
-  return (
-    <>
-      <Link to="/" className="back">Back to subjects</Link>
-      <h1>{subject.name}</h1>
-      <div className="progress"><span style={{ width: `${pct}%` }} /></div>
-      <p className="small">{count} of {allTopics.length} topics done ({pct}%)</p>
-      {next && <Link to={`/topic/${next.id}`} className="btn primary">Continue: {next.title}</Link>}
-
-      {units.map((u) => (
-        <section key={u.id} className="unit">
-          <h2>Unit {u.unit_number}: {u.title}</h2>
-          {[...u.topics].sort((a, b) => a.position - b.position).map((t) => {
-            const note = Array.isArray(t.notes) ? t.notes[0] : t.notes
-            const hasNote = note && note.current_version_id
-            const isDone = done.includes(t.id)
-            return (
-              <Link key={t.id} to={`/topic/${t.id}`} className="topic-row">
-                <span className={`tick ${isDone ? 'on' : ''}`} aria-label={isDone ? 'Completed' : 'Not completed'}>
-                  {isDone ? '✓' : ''}
-                </span>
-                <span className="topic-title">{t.title}</span>
-                {!hasNote && <span className="tag">No notes yet</span>}
-              </Link>
-            )
-          })}
+          )}
         </section>
-      ))}
-    </>
-  )
-}
+      )}
 
-export function Saved() {
-  const [saved] = useSavedList('copykaro:saved')
-  const [done] = useSavedList('copykaro:done')
-  const [topics, setTopics] = useState({})
-  const [error, setError] = useState('')
+      {results === null && (
+        <>
+          <section className="features">
+            {FEATURES.map(([icon, label]) => (
+              <div key={label} className="feat">
+                <div className="feat-ic"><Icon name={icon} /></div>
+                <h3>{label}</h3>
+              </div>
+            ))}
+          </section>
 
-  useEffect(() => {
-    const ids = [...new Set([...saved, ...done])]
-    if (ids.length === 0) return
-    supabase
-      .from('topics')
-      .select('id,title,units(subjects(name))')
-      .in('id', ids)
-      .then(({ data, error }) => {
-        if (error) return setError(error.message)
-        setTopics(Object.fromEntries(data.map((t) => [t.id, t])))
-      })
-  }, [])
-
-  const list = (ids) =>
-    ids.filter((id) => topics[id]).map((id) => (
-      <Link key={id} to={`/topic/${id}`} className="topic-row">
-        <span className="topic-title">{topics[id].title}</span>
-        <span className="small muted">{topics[id].units?.subjects?.name}</span>
-      </Link>
-    ))
-
-  return (
-    <>
-      <h1>My study</h1>
-      <p className="lead">Saved on this device only. Clearing your browser data removes it.</p>
-      {error && <p className="error">Could not load your list: {error}</p>}
-
-      <section className="unit">
-        <h2>Bookmarks ({saved.length})</h2>
-        {saved.length === 0 ? <p className="empty">Nothing bookmarked yet. Open a topic and tap Bookmark.</p> : list(saved)}
-      </section>
-
-      <section className="unit">
-        <h2>Completed ({done.length})</h2>
-        {done.length === 0 ? <p className="empty">No completed topics yet.</p> : list(done)}
-      </section>
+          <section className="section">
+            <h2>Your subjects</h2>
+            {!subjects && !error && <p className="muted">Loading subjects…</p>}
+            {subjects && subjects.length === 0 && <p className="empty">No subjects have been added yet.</p>}
+            <div className="grid">
+              {subjects && subjects.map((s, i) => {
+                const ids = s.units.flatMap((u) => u.topics.map((t) => t.id))
+                const count = ids.filter((id) => done.includes(id)).length
+                const pct = ids.length ? Math.round((count / ids.length) * 100) : 0
+                const sem = s.semesters
+                return (
+                  <Link key={s.id} to={`/subject/${s.id}`} className={`subject-card tone-${i % 6}`}>
+                    <div className="sc-ic"><Icon name={SUBJECT_ICONS[i % 6]} /></div>
+                    <h3>{s.name}</h3>
+                    <p className="small muted">
+                      {s.units.length} {s.units.length === 1 ? 'Unit' : 'Units'}
+                      {sem ? `, Semester ${sem.number}` : ''}
+                    </p>
+                    <div className="progress"><span style={{ width: `${pct}%` }} /></div>
+                    <p className="small muted">{pct}% completed</p>
+                  </Link>
+                )
+              })}
+            </div>
+            {subjects && allTopics.length > 0 && (
+              <p className="small muted stats">
+                {subjects.length} {subjects.length === 1 ? 'subject' : 'subjects'}, {allTopics.length} topics, {withNotes} with notes so far.
+              </p>
+            )}
+          </section>
+        </>
+      )}
     </>
   )
 }
