@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase, fileUrl, useAuthCtx } from './lib'
+import { compressPdf } from './compress'
 
 export function Login() {
   const nav = useNavigate()
@@ -38,6 +39,11 @@ export function Login() {
 }
 
 const fmt = (d) => new Date(d).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+const mb = (n) => (n / 1048576).toFixed(1)
+const LEVELS = {
+  balanced: { scale: 1.5, quality: 0.6 },
+  smaller: { scale: 1.2, quality: 0.5 },
+}
 
 export function Contribute() {
   const auth = useAuthCtx()
@@ -50,6 +56,8 @@ export function Contribute() {
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState('')
   const [mine, setMine] = useState([])
+  const [compress, setCompress] = useState(true)
+  const [level, setLevel] = useState('balanced')
 
   useEffect(() => {
     supabase
@@ -85,8 +93,23 @@ export function Contribute() {
     setMsg('')
     if (!topicId || !file || !desc.trim()) return setMsg('Choose a topic, add a PDF, and describe what this version covers or changes.')
     if (file.type !== 'application/pdf') return setMsg('Only PDF files are allowed.')
-    if (file.size > 20 * 1024 * 1024) return setMsg('The file is over 20 MB. Please compress it.')
+    if (file.size > 150 * 1024 * 1024) return setMsg('The file is over 150 MB. Please split it into parts.')
+    if (!compress && file.size > 20 * 1024 * 1024) return setMsg('The file is over 20 MB. Turn on compression or make it smaller.')
     setBusy(true)
+
+    let upFile = file
+    if (compress) {
+      try {
+        upFile = await compressPdf(file, { ...LEVELS[level], onProgress: (i, n) => setMsg(`Compressing page ${i} of ${n}…`) })
+      } catch (err) {
+        upFile = file
+        setMsg('Could not compress this file, using the original.')
+      }
+    }
+    if (upFile.size > 20 * 1024 * 1024) {
+      setBusy(false)
+      return setMsg('Still over 20 MB after compressing. Please split the notes into smaller PDFs.')
+    }
 
     const { data: note } = await supabase.from('notes').select('id').eq('topic_id', topicId).maybeSingle()
     if (!note) {
@@ -95,7 +118,7 @@ export function Contribute() {
     }
 
     const path = `${topicId}/${Date.now()}.pdf`
-    const up = await supabase.storage.from('notes').upload(path, file, { contentType: 'application/pdf' })
+    const up = await supabase.storage.from('notes').upload(path, upFile, { contentType: 'application/pdf' })
     if (up.error) {
       setBusy(false)
       return setMsg('Upload failed: ' + up.error.message)
@@ -124,7 +147,7 @@ export function Contribute() {
 
     setBusy(false)
     if (error) return setMsg('Could not save: ' + error.message)
-    setMsg('Submitted! The admin will review it.')
+    setMsg(`Submitted! Size ${mb(file.size)} MB to ${mb(upFile.size)} MB. The admin will review it.`)
     setFile(null)
     setDesc('')
     e.target.reset()
@@ -161,6 +184,18 @@ export function Contribute() {
         <label>What does this version cover or change?
           <textarea rows="3" value={desc} onChange={(e) => setDesc(e.target.value)} />
         </label>
+        <label>
+          <input type="checkbox" checked={compress} onChange={(e) => setCompress(e.target.checked)} /> Compress the PDF
+        </label>
+        {compress && (
+          <label>Compression
+            <select value={level} onChange={(e) => setLevel(e.target.value)}>
+              <option value="balanced">Balanced (good quality)</option>
+              <option value="smaller">Smaller file (lower quality)</option>
+            </select>
+          </label>
+        )}
+        <p className="small muted">Compressing turns each page into an image, so text can’t be selected or searched. It works best for scanned or handwritten notes. Untick it for typed PDFs.</p>
         <p className="small muted">Only upload notes you wrote or have permission to share, and make sure they match the syllabus.</p>
         <button className="btn primary" type="submit" disabled={busy}>{busy ? 'Uploading…' : 'Submit for review'}</button>
         {msg && <p className="small"><strong>{msg}</strong></p>}
@@ -175,7 +210,9 @@ export function Contribute() {
             <span className={`tag st-${v.status}`}> {v.status}</span>
             <p className="small muted">Version {v.version_number}, {fmt(v.created_at)}</p>
             {v.review_comment && <p className="small">Admin: {v.review_comment}</p>}
-            <a href={fileUrl(v.file_path)} target="_blank" rel="noreferrer">Open file</a>
+            {v.status === 'rejected'
+              ? <p className="small muted">The file was removed after rejection. Fix the issues and upload again.</p>
+              : <a href={fileUrl(v.file_path)} target="_blank" rel="noreferrer">Open file</a>}
           </div>
         ))}
       </section>
