@@ -11,6 +11,8 @@ export function Admin() {
   const [reports, setReports] = useState([])
   const [comments, setComments] = useState({})
   const [msg, setMsg] = useState('')
+  const [tab, setTab] = useState('pending')
+  const [totals, setTotals] = useState({ topics: 0, live: 0 })
 
   async function load() {
     const { data: p } = await supabase
@@ -32,6 +34,10 @@ export function Admin() {
       .eq('status', 'open')
       .order('created_at')
     setReports(r || [])
+
+    const t = await supabase.from('topics').select('id', { count: 'exact', head: true })
+    const n = await supabase.from('notes').select('id', { count: 'exact', head: true }).not('current_version_id', 'is', null)
+    setTotals({ topics: t.count || 0, live: n.count || 0 })
   }
 
   useEffect(() => {
@@ -70,46 +76,59 @@ export function Admin() {
 
   return (
     <>
-      <h1>Admin review</h1>
+      <h1>Admin panel</h1>
+
+      <div className="stats-grid">
+        <div className="stat tone-3"><b>{pending.length}</b><span>Pending updates</span></div>
+        <div className="stat tone-0"><b>{totals.topics}</b><span>Total topics</span></div>
+        <div className="stat tone-2"><b>{totals.live}</b><span>Notes live</span></div>
+        <div className="stat tone-4"><b>{reports.length}</b><span>Open reports</span></div>
+      </div>
+
+      <div className="tabs" role="tablist">
+        <button role="tab" aria-selected={tab === 'pending'} className={`tab ${tab === 'pending' ? 'on' : ''}`} onClick={() => setTab('pending')}>Pending updates</button>
+        <button role="tab" aria-selected={tab === 'reports'} className={`tab ${tab === 'reports' ? 'on' : ''}`} onClick={() => setTab('reports')}>Reports</button>
+      </div>
       {msg && <p className="small"><strong>{msg}</strong></p>}
 
-      <section className="unit">
-        <h2>Pending uploads ({pending.length})</h2>
-        {pending.length === 0 && <p className="empty">Nothing waiting for review.</p>}
-        {pending.map((v) => (
-          <div key={v.id} className="version">
-            <strong>{v.notes?.topics?.title}</strong>
-            <span className="small muted"> {v.notes?.topics?.units?.subjects?.name}</span>
-            <p className="small muted">Version {v.version_number} by {names[v.contributor_id] || 'Contributor'}, {fmt(v.created_at)}</p>
-            <p>{v.change_description}</p>
-            <a href={fileUrl(v.file_path)} target="_blank" rel="noreferrer">Open file to check</a>
-            <label>Comment (required to reject)
-              <input value={comments[v.id] || ''} onChange={(e) => setComments({ ...comments, [v.id]: e.target.value })} />
-            </label>
-            <div className="actions">
-              <button className="btn ok" onClick={() => approve(v.id)}>Approve</button>
-              <button className="btn" onClick={() => reject(v.id, v.file_path)}>Reject and delete file</button>
+      {tab === 'pending' && (
+        <section>
+          {pending.length === 0 && <p className="empty">Nothing waiting for review.</p>}
+          {pending.map((v) => (
+            <div key={v.id} className="card review">
+              <strong>{v.notes?.topics?.title}</strong>
+              <span className="small muted"> {v.notes?.topics?.units?.subjects?.name}</span>
+              <p className="small muted">Version {v.version_number} by {names[v.contributor_id] || 'Contributor'}, {fmt(v.created_at)}</p>
+              <p>{v.change_description}</p>
+              <a href={fileUrl(v.file_path)} target="_blank" rel="noreferrer">Open file to check</a>
+              <label>Comment (required to reject)
+                <input value={comments[v.id] || ''} onChange={(e) => setComments({ ...comments, [v.id]: e.target.value })} />
+              </label>
+              <div className="actions">
+                <button className="btn approve" onClick={() => approve(v.id)}>Approve</button>
+                <button className="btn reject" onClick={() => reject(v.id, v.file_path)}>Reject and delete file</button>
+              </div>
             </div>
-          </div>
-        ))}
-      </section>
+          ))}
+        </section>
+      )}
 
-      <section className="unit">
-        <h2>Open reports ({reports.length})</h2>
-        {reports.length === 0 && <p className="empty">No open reports.</p>}
-        {reports.map((r) => (
-          <div key={r.id} className="version">
-            <strong>{r.notes?.topics?.title}</strong>
-            <span className="tag"> {r.reason}</span>
-            <p className="small muted">{fmt(r.created_at)}</p>
-            {r.details && <p>{r.details}</p>}
-            <div className="actions">
-              <button className="btn" onClick={() => closeReport(r.id, 'resolved')}>Resolved</button>
-              <button className="btn" onClick={() => closeReport(r.id, 'dismissed')}>Dismiss</button>
+      {tab === 'reports' && (
+        <section>
+          {reports.length === 0 && <p className="empty">No open reports.</p>}
+          {reports.map((r) => (
+            <div key={r.id} className="card review">
+              <strong>{r.notes?.topics?.title}</strong> <span className="pill amber">{r.reason}</span>
+              <p className="small muted">{fmt(r.created_at)}</p>
+              {r.details && <p>{r.details}</p>}
+              <div className="actions">
+                <button className="btn approve" onClick={() => closeReport(r.id, 'resolved')}>Resolved</button>
+                <button className="btn" onClick={() => closeReport(r.id, 'dismissed')}>Dismiss</button>
+              </div>
             </div>
-          </div>
-        ))}
-      </section>
+          ))}
+        </section>
+      )}
     </>
   )
 }
