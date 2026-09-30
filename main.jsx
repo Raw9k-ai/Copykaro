@@ -12,6 +12,8 @@ import { Login, Contribute } from './staff'
 import { Admin } from './admin'
 import { Syllabus } from './syllabus'
 
+const LABPATRA_URL = 'https://raw9k-ai.github.io/LabPatra/'
+
 function App() {
   const auth = useAuthCtx()
   const { pathname } = useLocation()
@@ -40,6 +42,7 @@ function App() {
           <nav className="topnav">
             <NavLink to="/" end>Subjects</NavLink>
             <NavLink to="/saved">My study</NavLink>
+            <a href={LABPATRA_URL} target="_blank" rel="noreferrer">LabPatra ↗</a>
           </nav>
           {staff
             ? <NavLink className="btn small" to={auth.role === 'admin' ? '/admin' : '/contribute'}>Dashboard</NavLink>
