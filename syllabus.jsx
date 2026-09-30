@@ -288,4 +288,4 @@ export function Syllabus() {
       )}
     </>
   )
-}
+                                                                                             }
