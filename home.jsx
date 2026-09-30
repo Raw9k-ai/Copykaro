@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase, useSavedList } from './lib'
 import { Icon, SUBJECT_ICONS, HeroArt } from './ui'
 
+const LABPATRA_URL = 'https://raw9k-ai.github.io/LabPatra/'
 const noteOf = (t) => (Array.isArray(t.notes) ? t.notes[0] : t.notes)
 
 const FEATURES = [
@@ -80,7 +81,10 @@ export function Home() {
               onChange={(e) => setQ(e.target.value)}
             />
           </div>
-          {last && !q && <Link to={`/topic/${last.id}`} className="btn primary">Continue: {last.title}</Link>}
+          <div className="actions">
+            {last && !q && <Link to={`/topic/${last.id}`} className="btn primary">Continue: {last.title}</Link>}
+            <a className="btn" href={LABPATRA_URL} target="_blank" rel="noreferrer">Make a lab cover page (LabPatra) ↗</a>
+          </div>
         </div>
         <HeroArt />
       </section>
@@ -154,4 +158,4 @@ export function Home() {
       )}
     </>
   )
-}
+                    }
