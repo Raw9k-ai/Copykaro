@@ -66,4 +66,8 @@
 .tab.on { color: var(--blue); border-bottom-color: var(--blue); }
 .review { margin-bottom: 14px; }
 .subject-card .college { font-size: 0.78rem; opacity: 0.85; margin-bottom: 0; }
-            
+
+/* brand logo */
+.logo { color: #10285a; letter-spacing: -0.01em; }
+.logo-img { display: block; width: 38px; height: 38px; object-fit: contain; }
+.logo-k { color: #f5a800; }
