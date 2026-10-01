@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import icon from './icon.png'
 
 const PATHS = {
   grid: (<><rect x="4" y="4" width="6" height="6" rx="1.2" /><rect x="14" y="4" width="6" height="6" rx="1.2" /><rect x="4" y="14" width="6" height="6" rx="1.2" /><rect x="14" y="14" width="6" height="6" rx="1.2" /></>),
@@ -30,8 +31,8 @@ export function Icon({ name, size = 22 }) {
 export function Logo() {
   return (
     <span className="logo">
-      <span className="logo-mark"><Icon name="book" size={18} /></span>
-      Copykaro
+      <img className="logo-img" src={icon} alt="" width="38" height="38" />
+      <span>Copy<span className="logo-k">Karo</span></span>
     </span>
   )
 }
